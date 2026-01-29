@@ -3047,15 +3047,32 @@ function placeOrder(){
         timestamp: timestamp
     }
 
-    // ===== 1. SAVE TO GOOGLE SHEETS =====
+        // ===== 1. SAVE TO GOOGLE SHEETS AND GET ORDER ID =====
     const SHEETS_API = 'https://script.google.com/macros/s/AKfycbzYQ4PDoTAeBnEX7sJo_dc8ew54W7WpCIcdV9-0wR3BeIh-qtmaCkplkHlIIIHzfGVlRQ/exec'
     
+    // Remove mode: 'no-cors' so we can get response
     fetch(SHEETS_API, {
         method: 'POST',
-        mode: 'no-cors',
+        headers: {
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify(orderData)
     })
-    .then(() => {
+    .then(response => response.json())
+    .then(result => {
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to save order');
+        }
+        
+        // USE THE ORDER ID FROM GOOGLE SHEETS (not local one)
+        const orderId = result.orderId;
+        const verificationLink = result.verificationLink;
+        const timestamp = result.timestamp || new Date().toLocaleString('en-PK');
+        
+        // Update orderData with the correct ID
+        orderData.orderId = orderId;
+        orderData.verificationLink = verificationLink;
+        orderData.timestamp = timestamp;
         // ===== 2. SEND EMAIL COPY (YOUR ORIGINAL SYSTEM) =====
         // Build detailed order summary for email
         let emailOrderSummary = "📄 *DETAILED ORDER COPY (CANNOT BE EDITED)* 📄\n\n"
@@ -3220,3 +3237,4 @@ document.head.appendChild(style)
 </script>
 </body>
 </html>
+
