@@ -3042,7 +3042,7 @@ function placeOrder(){
     }
 
     // ===== 1. SAVE TO GOOGLE SHEETS =====
-    const SHEETS_API = 'https://script.google.com/macros/s/AKfycbzQr-gW1D-y3i-DwjbPHn5u-lVNLpR9QOEroPfU_qf1RLImBbWfAnheCdUXPm5GiUHWGA/exec'
+    const SHEETS_API = 'https://script.google.com/macros/s/AKfycbzDFZAYUPw5fmaN9gyqM71OJixa1HboOlR7F7D2GZ0ddC6nNG2_eToYiY4jN0EAaHNWEw/exec'
     
     fetch(SHEETS_API, {
         method: 'POST',
@@ -3050,34 +3050,38 @@ function placeOrder(){
         body: JSON.stringify(orderData)
     })
     .then(() => {
-        // ===== 2. SEND EMAIL COPY =====
-        let emailOrderSummary = "📄 *DETAILED ORDER COPY (CANNOT BE EDITED)* 📄\n\n"
-        emailOrderSummary += `Order #${orderId}\n`
-        emailOrderSummary += `Date: ${timestamp}\n`
-        emailOrderSummary += `Customer: ${name}\n`
-        emailOrderSummary += `Phone: ${phone}\n`
-        if(email) emailOrderSummary += `Email: ${email}\n`
-        emailOrderSummary += `Shipping: ${orderData.shippingMethod}\n`
-        emailOrderSummary += `Payment: ${orderData.paymentMethod}\n`
-        if(address) emailOrderSummary += `Address: ${address}\n`
-        emailOrderSummary += `\n--- ORDER ITEMS ---\n`
+        // ===== 2. BUILD EMAIL SUMMARY (OLD TEMPLATE STYLE - NO ID IN SUMMARY) =====
+        let emailOrderSummary = `*Order placed through www.hayyatstore.com*\n`;
+        emailOrderSummary += `*NEW PAPER ORDER REQUEST*\n\n`;
+        
+        emailOrderSummary += `*Order Summary:*\n`;
+        emailOrderSummary += `Subtotal: Rs ${formatNumber(total - deliveryCharges)}\n`;
+        if(deliveryCharges > 0) emailOrderSummary += `Delivery: Rs ${formatNumber(deliveryCharges)}\n`;
+        emailOrderSummary += `*GRAND TOTAL: Rs ${formatNumber(total)}*\n`;
+        emailOrderSummary += `Total Weight: ${Math.round(totalWeight)} KG\n\n`;
+
+        emailOrderSummary += `*Customer Details:*\n`;
+        emailOrderSummary += ` Name: ${name}\n`;
+        emailOrderSummary += ` Phone: ${phone}\n`;
+        emailOrderSummary += ` Shipping: ${orderData.shippingMethod}\n`;
+        emailOrderSummary += ` Payment: ${orderData.paymentMethod}\n\n`;
+
+        emailOrderSummary += `*Order Items (${cartItems.length} types):*\n\n`;
         
         cartItems.forEach((item, index) => {
-            emailOrderSummary += `${index + 1}. ${item.name}\n`
-            emailOrderSummary += `    Size: ${item.size} | GSM: ${item.gsm}`
-            if(item.selectedBrand) emailOrderSummary += ` | Brand: ${item.selectedBrand}`
-            if(item.selectedColor) emailOrderSummary += ` | Color: ${item.selectedColor}`
-            emailOrderSummary += `\n    Qty: ${item.qty} × Rs ${formatNumber(item.price)} = Rs ${formatNumber(item.price * item.qty)}\n\n`
-        })
-        
-        emailOrderSummary += `--- TOTALS ---\n`
-        emailOrderSummary += `Subtotal: Rs ${formatNumber(total - deliveryCharges)}\n`
-        if(deliveryCharges > 0) emailOrderSummary += `Delivery: Rs ${formatNumber(deliveryCharges)}\n`
-        emailOrderSummary += `TOTAL: Rs ${formatNumber(total)}\n`
-        emailOrderSummary += `Weight: ${Math.round(totalWeight)} KG\n`
-        emailOrderSummary += `\nVerification Link: ${verificationLink}\n`
-        emailOrderSummary += `\n⚠️ This is the original unedited order copy.`
+            emailOrderSummary += `${index + 1}. *${item.name}*\n`;
+            emailOrderSummary += `    Size: ${item.size} | GSM: ${item.gsm}`;
+            if(item.selectedBrand) emailOrderSummary += ` | Brand: ${item.selectedBrand}`;
+            if(item.selectedColor) emailOrderSummary += ` | Color: ${item.selectedColor}`;
+            emailOrderSummary += `\n    Qty: ${item.qty} × Rs ${formatNumber(item.price)} = Rs ${formatNumber(item.price * item.qty)}\n`;
+            emailOrderSummary += `    Weight: ${item.weight * item.qty} KG\n\n`;
+        });
 
+        emailOrderSummary += `*Verification Link:* \n${verificationLink}\n\n`; 
+        emailOrderSummary += `_Please confirm availability and provide payment details._\n\n`;
+        emailOrderSummary += `⚠️ This is the original unedited order copy.`;
+
+        // Send email via your original Apps Script
         const EMAIL_API = 'https://script.google.com/macros/s/AKfycbw-h33gLXwPGRdnlURFncIhf3W8AS55ikyJN8Db4IZaydA4BwXxyG4gkSghUlluOznFWg/exec'
         
         const emailData = {
@@ -3090,7 +3094,7 @@ function placeOrder(){
             orderSummary: emailOrderSummary,
             orderTotal: total,
             orderWeight: Math.round(totalWeight),
-            orderId: orderId,
+            orderId: orderId, // Sent for backend tracking
             verificationLink: verificationLink
         };
 
@@ -3198,4 +3202,3 @@ document.head.appendChild(style)
 </script>
 </body>
 </html>
-
