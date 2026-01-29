@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hayyat Paper Store - Order Verification</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
+        .invoice-box {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 3px solid #2c3e50;
+        }
+        
+        .tracking-box {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 3px solid #3498db;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #2c3e50;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .order-id {
+            background: #ff8400;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 50px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+        
+        .customer-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ddd;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 120px;
+        }
+        
+        .info-value {
+            color: #34495e;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        
+        .items-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .items-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .items-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .total-row {
+            background: #2c3e50 !important;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .total-row td {
+            padding: 15px 12px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #856404;
+        }
+        
+        .tracking-header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #3498db;
+        }
+        
+        .tracking-header h2 {
+            color: #3498db;
+            font-size: 22px;
+        }
+        
+        .steps-container {
+            position: relative;
+            padding: 20px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            position: relative;
+            padding-left: 70px;
+        }
+        
+        .step-icon {
+            position: absolute;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 2;
+        }
+        
+        .step.active .step-icon {
+            background: #2ecc71;
+            color: white;
+            box-shadow: 0 0 0 5px rgba(46, 204, 113, 0.2);
+        }
+        
+        .step.inactive .step-icon {
+            background: #ecf0f1;
+            color: #95a5a6;
+        }
+        
+        .step-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+        
+        .step-desc {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .status-received { background: #3498db; color: white; }
+        .status-pending { background: #f39c12; color: white; }
+        .status-dispatched { background: #2ecc71; color: white; }
+        .status-delivered { background: #27ae60; color: white; }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+        }
+        
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            color: #721c24;
+        }
+        
+        .whatsapp-btn {
+            display: block;
+            width: 100%;
+            background: #25D366;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        
+        .whatsapp-btn:hover {
+            background: #1DA851;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Invoice Section -->
+        <div class="invoice-box">
+            <div class="header">
+                <h1>HAYYAT PAPER STORE</h1>
+                <div class="order-id" id="orderId">LOADING...</div>
+            </div>
+            
+            <div id="invoiceContent">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading order details...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tracking Section -->
+        <div class="tracking-box">
+            <div class="tracking-header">
+                <h2>📦 ORDER TRACKING</h2>
+            </div>
+            
+            <div id="trackingContent">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading tracking information...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get order ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order');
+        
+        // Your Google Apps Script URL
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzYQ4PDoTAeBnEX7sJo_dc8ew54W7WpCIcdV9-0wR3BeIh-qtmaCkplkHlIIIHzfGVlRQ/exec';
+        
+        if (!orderId) {
+            showError('No order ID provided in the URL');
+        } else {
+            fetchOrderDetails(orderId);
+        }
+        
+        function fetchOrderDetails(orderId) {
+            document.getElementById('orderId').textContent = orderId;
+            
+            fetch(`${API_URL}?order=${orderId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        displayInvoice(data);
+                        displayTracking(data);
+                    }
+                })
+                .catch(error => {
+                    showError('Failed to load order: ' + error.message);
+                });
+        }
+        
+        function displayInvoice(order) {
+            const invoiceDiv = document.getElementById('invoiceContent');
+            
+            let html = `
+                <div class="customer-info">
+                    <div class="info-row">
+                        <div class="info-label">Customer:</div>
+                        <div class="info-value">${order.customerName}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Phone:</div>
+                        <div class="info-value">${order.customerPhone}</div>
+                    </div>
+                    ${order.customerEmail ? `
+                    <div class="info-row">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">${order.customerEmail}</div>
+                    </div>` : ''}
+                    <div class="info-row">
+                        <div class="info-label">Order Date:</div>
+                        <div class="info-value">${order.createdAt}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Payment:</div>
+                        <div class="info-value">${order.paymentMethod}</div>
+                    </div>
+                </div>
+                
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            // Add items
+            order.items.forEach((item, index) => {
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${item.name}</strong><br>
+                            <small>${item.size}, ${item.gsm} GSM${item.selectedBrand ? `, ${item.selectedBrand}` : ''}${item.selectedColor ? `, ${item.selectedColor}` : ''}</small>
+                        </td>
+                        <td>${item.qty}</td>
+                        <td>Rs ${formatNumber(item.price)}</td>
+                        <td>Rs ${formatNumber(item.price * item.qty)}</td>
+                    </tr>`;
+            });
+            
+            // Calculate totals
+            const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const deliveryCharges = order.totalAmount - subtotal;
+            
+            html += `
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align: right;">Subtotal:</td>
+                            <td><strong>Rs ${formatNumber(subtotal)}</strong></td>
+                        </tr>
+                        ${deliveryCharges > 0 ? `
+                        <tr>
+                            <td colspan="3" style="text-align: right;">Delivery:</td>
+                            <td><strong>Rs ${formatNumber(deliveryCharges)}</strong></td>
+                        </tr>` : ''}
+                        <tr class="total-row">
+                            <td colspan="3">GRAND TOTAL:</td>
+                            <td>Rs ${formatNumber(order.totalAmount)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                
+                <div class="warning">
+                    ⚠️ <strong>SYSTEM GENERATED RECEIPT</strong><br>
+                    Do not edit - Verify with original WhatsApp message
+                </div>`;
+            
+            invoiceDiv.innerHTML = html;
+        }
+        
+        function displayTracking(order) {
+            const trackingDiv = document.getElementById('trackingContent');
+            
+            const statusSteps = [
+                { id: 'received', title: 'Order Received', desc: 'We have received your order', icon: '📥' },
+                { id: 'pending', title: 'Payment Pending', desc: 'Waiting for payment confirmation', icon: '⏳' },
+                { id: 'dispatched', title: 'Order Dispatched', desc: 'Your order is on the way', icon: '🚚' }
+            ];
+            
+            let html = `
+                <div class="steps-container">
+                    <div class="current-status">
+                        <div class="status-badge status-${order.status.toLowerCase().replace(' ', '-')}">
+                            Current Status: ${order.status}
+                        </div>
+                    </div>`;
+            
+            statusSteps.forEach((step, index) => {
+                const isActive = getStepStatus(order.status, step.id);
+                html += `
+                    <div class="step ${isActive ? 'active' : 'inactive'}">
+                        <div class="step-icon">${step.icon}</div>
+                        <div class="step-content">
+                            <div class="step-title">${step.title}</div>
+                            <div class="step-desc">${step.desc}</div>
+                            ${isActive ? '<div style="color: #2ecc71; font-size: 12px; margin-top: 5px;">✓ COMPLETED</div>' : ''}
+                        </div>
+                    </div>`;
+            });
+            
+            html += `
+                </div>
+                <a href="https://wa.me/923036470666?text=Query about order ${order.orderId}" 
+                   class="whatsapp-btn" target="_blank">
+                   📱 Contact on WhatsApp
+                </a>`;
+            
+            trackingDiv.innerHTML = html;
+        }
+        
+        function getStepStatus(currentStatus, stepId) {
+            const statusOrder = ['received', 'pending', 'dispatched'];
+            const currentIndex = statusOrder.findIndex(s => currentStatus.toLowerCase().includes(s));
+            const stepIndex = statusOrder.indexOf(stepId);
+            
+            return stepIndex <= currentIndex;
+        }
+        
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        function showError(message) {
+            document.getElementById('invoiceContent').innerHTML = `
+                <div class="error">
+                    <h3>Error Loading Order</h3>
+                    <p>${message}</p>
+                    <p style="margin-top: 20px;">Please check the order link and try again.</p>
+                </div>`;
+            
+            document.getElementById('trackingContent').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
