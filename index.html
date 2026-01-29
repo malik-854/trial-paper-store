@@ -2989,7 +2989,6 @@ function placeOrder(){
     let deliveryCharges = 0
     if(shipping === "open" || shipping === "bundle"){
         if (shipping === "open") {
-            // OPEN delivery logic
             let baseCharges = Math.max(Math.round(totalWeight * 3), 450)
             let currentTotalWithBase = total + baseCharges
             
@@ -3001,33 +3000,29 @@ function placeOrder(){
                 deliveryCharges = baseCharges + amountToAdd
             }
         } else if (shipping === "bundle") {
-            // BUNDLE delivery logic
             let bundles = totalWeight / 70
             let decimalPart = bundles % 1
-            
             if (decimalPart <= 0.5) {
                 bundles = Math.floor(bundles)
             } else {
                 bundles = Math.ceil(bundles)
             }
-            
             bundles = Math.max(1, bundles)
             deliveryCharges = bundles * 250
         }
-        
         total += deliveryCharges
     }
+
+    // --- STEP 1: GENERATE ID ONCE ---
+    const orderId = 'HAYYAT-' + Math.random().toString(36).substr(2, 6).toUpperCase()
+    const verificationLink = `https://malik-854.github.io/trial-paper-store/verify.html?order=${orderId}`
+    const timestamp = new Date().toLocaleString('en-PK')
 
     // Show loading
     const whatsappBtn = document.querySelector('.whatsapp-btn')
     const originalText = whatsappBtn.innerHTML
     whatsappBtn.innerHTML = '⏳ Saving Order...'
     whatsappBtn.disabled = true
-
-    // Generate order ID
-    const orderId = 'HAYYAT-' + Math.random().toString(36).substr(2, 6).toUpperCase()
-    const verificationLink = `https://malik-854.github.io/trial-paper-store/verify.html?order=${orderId}`
-    const timestamp = new Date().toLocaleString('en-PK')
 
     // Prepare data for Google Sheets
     const orderData = {
@@ -3041,7 +3036,7 @@ function placeOrder(){
         totalAmount: total,
         totalWeight: Math.round(totalWeight),
         deliveryCharges: deliveryCharges,
-        orderId: orderId,
+        orderId: orderId, // THIS IS NOW PASSED TO GOOGLE
         verificationLink: verificationLink,
         timestamp: timestamp
     }
@@ -3055,25 +3050,24 @@ function placeOrder(){
         body: JSON.stringify(orderData)
     })
     .then(() => {
-        // ===== 2. SEND EMAIL COPY (YOUR ORIGINAL SYSTEM) =====
-        // Build detailed order summary for email
+        // ===== 2. SEND EMAIL COPY =====
         let emailOrderSummary = "📄 *DETAILED ORDER COPY (CANNOT BE EDITED)* 📄\n\n"
         emailOrderSummary += `Order #${orderId}\n`
         emailOrderSummary += `Date: ${timestamp}\n`
         emailOrderSummary += `Customer: ${name}\n`
         emailOrderSummary += `Phone: ${phone}\n`
         if(email) emailOrderSummary += `Email: ${email}\n`
-        emailOrderSummary += `Shipping: ${shipping === "self" ? "Self Pickup" : shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"}\n`
-        emailOrderSummary += `Payment: ${payment === "shop" ? "Pay at Shop" : "Bank Transfer"}\n`
+        emailOrderSummary += `Shipping: ${orderData.shippingMethod}\n`
+        emailOrderSummary += `Payment: ${orderData.paymentMethod}\n`
         if(address) emailOrderSummary += `Address: ${address}\n`
         emailOrderSummary += `\n--- ORDER ITEMS ---\n`
         
         cartItems.forEach((item, index) => {
             emailOrderSummary += `${index + 1}. ${item.name}\n`
-            emailOrderSummary += `   Size: ${item.size} | GSM: ${item.gsm}`
+            emailOrderSummary += `    Size: ${item.size} | GSM: ${item.gsm}`
             if(item.selectedBrand) emailOrderSummary += ` | Brand: ${item.selectedBrand}`
             if(item.selectedColor) emailOrderSummary += ` | Color: ${item.selectedColor}`
-            emailOrderSummary += `\n   Qty: ${item.qty} × Rs ${formatNumber(item.price)} = Rs ${formatNumber(item.price * item.qty)}\n\n`
+            emailOrderSummary += `\n    Qty: ${item.qty} × Rs ${formatNumber(item.price)} = Rs ${formatNumber(item.price * item.qty)}\n\n`
         })
         
         emailOrderSummary += `--- TOTALS ---\n`
@@ -3084,15 +3078,14 @@ function placeOrder(){
         emailOrderSummary += `\nVerification Link: ${verificationLink}\n`
         emailOrderSummary += `\n⚠️ This is the original unedited order copy.`
 
-        // Send email via your original Apps Script
         const EMAIL_API = 'https://script.google.com/macros/s/AKfycbw-h33gLXwPGRdnlURFncIhf3W8AS55ikyJN8Db4IZaydA4BwXxyG4gkSghUlluOznFWg/exec'
         
         const emailData = {
             customerName: name,
             customerPhone: phone,
             customerEmail: email || 'Not provided',
-            shippingMethod: shipping === "self" ? "Self Pickup" : (shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"),
-            paymentMethod: payment === "shop" ? "Pay at Shop" : "Bank Transfer",
+            shippingMethod: orderData.shippingMethod,
+            paymentMethod: orderData.paymentMethod,
             deliveryAddress: address || 'Self Pickup',
             orderSummary: emailOrderSummary,
             orderTotal: total,
@@ -3105,34 +3098,22 @@ function placeOrder(){
             method: 'POST',
             mode: 'no-cors',
             body: JSON.stringify(emailData)
-        }).catch(error => {
-            console.log('Email backup failed (non-critical):', error);
-        });
+        }).catch(e => console.log('Email failed (non-critical)'));
 
         // ===== 3. CREATE WHATSAPP MESSAGE WITH LINK =====
         let whatsappMessage = `✅ Order placed through www.hayyatstore.com\n\n`
         whatsappMessage += `📄 NEW PAPER ORDER REQUEST 📄\n\n`
-        whatsappMessage += `Order #${orderId} placed.\n`
-        whatsappMessage += `View order details: ${verificationLink}\n\n`
+        whatsappMessage += `Order #${orderId} placed.\n` // Uses the SAME orderId
+        whatsappMessage += `View order details: ${verificationLink}\n\n` // Uses the SAME link
         whatsappMessage += `Please forward this exact message.`
         
-        // Create WhatsApp URL
-        let whatsappNumber;
-        if ((shipping === "open" || shipping === "bundle") && payment === "bank") {
-            whatsappNumber = "923046470666";
-        } else {
-            whatsappNumber = "923036470666";
-        }
-        
+        let whatsappNumber = ((shipping === "open" || shipping === "bundle") && payment === "bank") ? "923046470666" : "923036470666";
         const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
         
-        // Open WhatsApp
         window.open(whatsappUrl, "_blank")
         
-        // Show success message
-        alert(`Order #${orderId} created!\n\n• WhatsApp opening with order link\n• Email copy sent to backup system\n• Order saved to database`)
+        alert(`Order #${orderId} created!\n\n• WhatsApp opening with order link\n• Order saved to database`)
         
-        // Clear cart
         setTimeout(() => {
             closeCheckout()
             cart = {}
@@ -3144,7 +3125,6 @@ function placeOrder(){
     })
     .catch(error => {
         alert("Failed to save order. Please try again.")
-        console.error("Order save error:", error)
         whatsappBtn.innerHTML = originalText
         whatsappBtn.disabled = false
     })
