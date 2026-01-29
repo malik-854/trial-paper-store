@@ -2941,6 +2941,13 @@ function placeOrder(){
     }
     const shipping = shippingElement.value
 
+    const paymentElement = document.querySelector('input[name="payment"]:checked')
+    if (!paymentElement) {
+        alert("Please select a payment method")
+        return
+    }
+    const payment = paymentElement.value
+
     if(!name){
         alert("Please enter your full name")
         document.getElementById("cust-name").focus()
@@ -2959,11 +2966,25 @@ function placeOrder(){
         return
     }
 
+    // Prepare cart data
+    let cartItems = []
     let total = 0
     let totalWeight = 0
     Object.values(cart).forEach(i => {
         total += i.price * i.qty
         totalWeight += i.weight * i.qty
+        
+        cartItems.push({
+            name: i.name,
+            size: i.size,
+            gsm: i.gsm,
+            selectedBrand: i.selectedBrand || '',
+            selectedColor: i.selectedColor || '',
+            qty: i.qty,
+            price: i.price,
+            weight: i.weight,
+            rate: i.rate
+        })
     })
 
     let deliveryCharges = 0
@@ -2998,106 +3019,138 @@ function placeOrder(){
         total += deliveryCharges
     }
 
-    // Build order message - REORDERED WITH COMMAS
-    let orderSummary = "✅ *Order placed through www.hayyatstore.com*\n\n"  // Add this line
-orderSummary += "📄 *NEW PAPER ORDER REQUEST* 📄\n\n"
-    
-    // ORDER SUMMARY AT THE TOP
-    const subtotal = total - deliveryCharges
-    orderSummary += "*Order Summary:*\n"
-    orderSummary += `Subtotal: Rs ${formatNumber(subtotal)}\n`
-    if(deliveryCharges > 0) orderSummary += `Delivery: Rs ${formatNumber(deliveryCharges)}\n`
-    orderSummary += `*GRAND TOTAL: Rs ${formatNumber(total)}*\n`
-    orderSummary += `Total Weight: ${Math.round(totalWeight)} KG\n\n`
-    
-    // CUSTOMER DETAILS (WITH DELIVERY CHARGES KEPT AS ORIGINAL)
-    orderSummary += "*Customer Details:*\n"
-    orderSummary += `👤 Name: ${name}\n`
-    orderSummary += `📱 Phone: ${phone}\n`
-    if(email) orderSummary += `📧 Email: ${email}\n`
-    orderSummary += `🚚 Shipping: ${shipping === "self" ? "Self Pickup" : shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"}\n`
-    orderSummary += `💰 Payment: ${document.querySelector('input[name="payment"]:checked').value === "bank" ? "Bank Transfer" : "Pay at Shop"}\n`
-    if(shipping === "open" || shipping === "bundle") {
-        orderSummary += `📍 Address: ${address}\n`
-        orderSummary += `💰 Delivery Charges (${shipping === "open" ? "Open" : "Bundle"}): Rs ${formatNumber(deliveryCharges)}\n`
-    }
-    orderSummary += `\n*Order Items (${Object.keys(cart).length} types):*\n`
+    // Show loading
+    const whatsappBtn = document.querySelector('.whatsapp-btn')
+    const originalText = whatsappBtn.innerHTML
+    whatsappBtn.innerHTML = '⏳ Saving Order...'
+    whatsappBtn.disabled = true
 
-    // ORDER ITEMS WITH FORMATTED PRICES
-    Object.values(cart).forEach((i, index) => {
-        const itemTotal = i.price * i.qty
-        const itemWeight = i.weight * i.qty
-        const formattedPrice = formatNumber(i.price)
-        const formattedItemTotal = formatNumber(itemTotal)
-        
-        orderSummary += `${index + 1}. *${i.name}*\n`
-        
-        // Build specifications line
-        let specs = `Size: ${i.size} | GSM: ${i.gsm}`
-        if (i.selectedBrand && i.selectedBrand !== '') {
-            specs += ` | Brand: ${i.selectedBrand}`
-        }
-        if (i.selectedColor && i.selectedColor !== '') {
-            specs += ` | Color: ${i.selectedColor}`
-        }
-        orderSummary += `   ${specs}\n`
-        
-        orderSummary += `   Qty: ${i.qty} packs × Rs ${formattedPrice} = Rs ${formattedItemTotal}\n`
-        orderSummary += `   Weight: ${Math.round(itemWeight)} KG @ Rs ${i.rate}/KG\n\n`
-    })
+    // Generate order ID
+    const orderId = 'HAYYAT-' + Math.random().toString(36).substr(2, 6).toUpperCase()
+    const verificationLink = `https://malik-854.github.io/trial-paper-store/verify.html?order=${orderId}`
+    const timestamp = new Date().toLocaleString('en-PK')
 
-    orderSummary += `⏳ _Please confirm availability and provide payment details._`
-    
-    // ===== START: Send email copy via Google Apps Script =====
-    const emailData = {
+    // Prepare data for Google Sheets
+    const orderData = {
         customerName: name,
         customerPhone: phone,
-        customerEmail: email || 'Not provided',
-        shippingMethod: shipping === "self" ? "Self Pickup" : (shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"),
-        paymentMethod: document.querySelector('input[name="payment"]:checked').value === "bank" ? "Bank Transfer" : "Pay at Shop",
-        deliveryAddress: address || 'Not applicable',
-        orderSummary: orderSummary,
-        orderTotal: total,
-        orderWeight: Math.round(totalWeight)
-    };
+        customerEmail: email,
+        shippingMethod: shipping === "self" ? "Self Pickup" : shipping === "open" ? "Delivery - Open" : "Delivery - Bundle",
+        paymentMethod: payment === "shop" ? "Pay at Shop" : "Bank Transfer",
+        deliveryAddress: address || 'Self Pickup',
+        items: cartItems,
+        totalAmount: total,
+        totalWeight: Math.round(totalWeight),
+        deliveryCharges: deliveryCharges,
+        orderId: orderId,
+        verificationLink: verificationLink,
+        timestamp: timestamp
+    }
 
-    fetch('https://script.google.com/macros/s/AKfycbw-h33gLXwPGRdnlURFncIhf3W8AS55ikyJN8Db4IZaydA4BwXxyG4gkSghUlluOznFWg/exec', {
+    // ===== 1. SAVE TO GOOGLE SHEETS =====
+    const SHEETS_API = 'https://script.google.com/macros/s/AKfycbzYQ4PDoTAeBnEX7sJo_dc8ew54W7WpCIcdV9-0wR3BeIh-qtmaCkplkHlIIIHzfGVlRQ/exec'
+    
+    fetch(SHEETS_API, {
         method: 'POST',
         mode: 'no-cors',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(emailData)
-    }).catch(error => {
-        console.log('Email backup failed (non-critical):', error);
-    });
-    // ===== END: Send email copy =====
+        body: JSON.stringify(orderData)
+    })
+    .then(() => {
+        // ===== 2. SEND EMAIL COPY (YOUR ORIGINAL SYSTEM) =====
+        // Build detailed order summary for email
+        let emailOrderSummary = "📄 *DETAILED ORDER COPY (CANNOT BE EDITED)* 📄\n\n"
+        emailOrderSummary += `Order #${orderId}\n`
+        emailOrderSummary += `Date: ${timestamp}\n`
+        emailOrderSummary += `Customer: ${name}\n`
+        emailOrderSummary += `Phone: ${phone}\n`
+        if(email) emailOrderSummary += `Email: ${email}\n`
+        emailOrderSummary += `Shipping: ${shipping === "self" ? "Self Pickup" : shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"}\n`
+        emailOrderSummary += `Payment: ${payment === "shop" ? "Pay at Shop" : "Bank Transfer"}\n`
+        if(address) emailOrderSummary += `Address: ${address}\n`
+        emailOrderSummary += `\n--- ORDER ITEMS ---\n`
+        
+        cartItems.forEach((item, index) => {
+            emailOrderSummary += `${index + 1}. ${item.name}\n`
+            emailOrderSummary += `   Size: ${item.size} | GSM: ${item.gsm}`
+            if(item.selectedBrand) emailOrderSummary += ` | Brand: ${item.selectedBrand}`
+            if(item.selectedColor) emailOrderSummary += ` | Color: ${item.selectedColor}`
+            emailOrderSummary += `\n   Qty: ${item.qty} × Rs ${formatNumber(item.price)} = Rs ${formatNumber(item.price * item.qty)}\n\n`
+        })
+        
+        emailOrderSummary += `--- TOTALS ---\n`
+        emailOrderSummary += `Subtotal: Rs ${formatNumber(total - deliveryCharges)}\n`
+        if(deliveryCharges > 0) emailOrderSummary += `Delivery: Rs ${formatNumber(deliveryCharges)}\n`
+        emailOrderSummary += `TOTAL: Rs ${formatNumber(total)}\n`
+        emailOrderSummary += `Weight: ${Math.round(totalWeight)} KG\n`
+        emailOrderSummary += `\nVerification Link: ${verificationLink}\n`
+        emailOrderSummary += `\n⚠️ This is the original unedited order copy.`
 
-    // Create WhatsApp URL
-    const whatsappMessage = encodeURIComponent(orderSummary)
-    // Check if delivery + bank transfer
-let whatsappNumber;
-if ((shipping === "open" || shipping === "bundle") && document.querySelector('input[name="payment"]:checked').value === "bank") {
-    whatsappNumber = "923046470666"; // New number for delivery + bank transfer
-} else {
-    whatsappNumber = "923036470666"; // Original number for all others
-}
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
+        // Send email via your original Apps Script
+        const EMAIL_API = 'https://script.google.com/macros/s/AKfycbw-h33gLXwPGRdnlURFncIhf3W8AS55ikyJN8Db4IZaydA4BwXxyG4gkSghUlluOznFWg/exec'
+        
+        const emailData = {
+            customerName: name,
+            customerPhone: phone,
+            customerEmail: email || 'Not provided',
+            shippingMethod: shipping === "self" ? "Self Pickup" : (shipping === "open" ? "Delivery - Open" : "Delivery - Bundle"),
+            paymentMethod: payment === "shop" ? "Pay at Shop" : "Bank Transfer",
+            deliveryAddress: address || 'Self Pickup',
+            orderSummary: emailOrderSummary,
+            orderTotal: total,
+            orderWeight: Math.round(totalWeight),
+            orderId: orderId,
+            verificationLink: verificationLink
+        };
 
-    // Open WhatsApp
-    window.open(whatsappUrl, "_blank")
-    
-    // Show confirmation
-    alert("Opening WhatsApp to send your order...")
-    
-    // Clear cart
-    setTimeout(() => {
-        closeCheckout()
-        cart = {}
-        renderCart()
-        updateCartBadge()
-    }, 1500)
+        fetch(EMAIL_API, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(emailData)
+        }).catch(error => {
+            console.log('Email backup failed (non-critical):', error);
+        });
+
+        // ===== 3. CREATE WHATSAPP MESSAGE WITH LINK =====
+        let whatsappMessage = `✅ Order placed through www.hayyatstore.com\n\n`
+        whatsappMessage += `📄 NEW PAPER ORDER REQUEST 📄\n\n`
+        whatsappMessage += `Order #${orderId} placed.\n`
+        whatsappMessage += `View order details: ${verificationLink}\n\n`
+        whatsappMessage += `Please forward this exact message.`
+        
+        // Create WhatsApp URL
+        let whatsappNumber;
+        if ((shipping === "open" || shipping === "bundle") && payment === "bank") {
+            whatsappNumber = "923046470666";
+        } else {
+            whatsappNumber = "923036470666";
+        }
+        
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
+        
+        // Open WhatsApp
+        window.open(whatsappUrl, "_blank")
+        
+        // Show success message
+        alert(`Order #${orderId} created!\n\n• WhatsApp opening with order link\n• Email copy sent to backup system\n• Order saved to database`)
+        
+        // Clear cart
+        setTimeout(() => {
+            closeCheckout()
+            cart = {}
+            renderCart()
+            updateCartBadge()
+            whatsappBtn.innerHTML = originalText
+            whatsappBtn.disabled = false
+        }, 1500)
+    })
+    .catch(error => {
+        alert("Failed to save order. Please try again.")
+        console.error("Order save error:", error)
+        whatsappBtn.innerHTML = originalText
+        whatsappBtn.disabled = false
+    })
 }
+
 // Handle window resize
 window.addEventListener('resize', function() {
     if (window.innerWidth > 768) {
