@@ -3024,9 +3024,9 @@ function placeOrder(){
     whatsappBtn.innerHTML = '⏳ Saving Order...'
     whatsappBtn.disabled = true
 
-    // Generate TEMPORARY order ID (will be replaced by Google Sheets)
-    const tempOrderId = 'HAYYAT-' + Math.random().toString(36).substr(2, 6).toUpperCase()
-    const tempVerificationLink = `https://malik-854.github.io/trial-paper-store/verify.html?order=${tempOrderId}`
+    // Generate order ID
+    const orderId = 'HAYYAT-' + Math.random().toString(36).substr(2, 6).toUpperCase()
+    const verificationLink = `https://malik-854.github.io/trial-paper-store/verify.html?order=${orderId}`
     const timestamp = new Date().toLocaleString('en-PK')
 
     // Prepare data for Google Sheets
@@ -3041,32 +3041,22 @@ function placeOrder(){
         totalAmount: total,
         totalWeight: Math.round(totalWeight),
         deliveryCharges: deliveryCharges,
-        orderId: tempOrderId,
-        verificationLink: tempVerificationLink,
+        orderId: orderId,
+        verificationLink: verificationLink,
         timestamp: timestamp
     }
 
-    // ===== 1. SAVE TO GOOGLE SHEETS USING JSONP (NO CORS ISSUE) =====
+    // ===== 1. SAVE TO GOOGLE SHEETS =====
     const SHEETS_API = 'https://script.google.com/macros/s/AKfycbzYQ4PDoTAeBnEX7sJo_dc8ew54W7WpCIcdV9-0wR3BeIh-qtmaCkplkHlIIIHzfGVlRQ/exec'
     
-    // Create unique callback name
-    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-    
-    // Define the callback function
-    window[callbackName] = function(result) {
-        // Clean up
-        delete window[callbackName];
-        
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to save order');
-        }
-        
-        // USE THE ORDER ID FROM GOOGLE SHEETS (not local one)
-        const orderId = result.orderId;
-        const verificationLink = result.verificationLink;
-        const timestamp = result.timestamp || new Date().toLocaleString('en-PK');
-        
+    fetch(SHEETS_API, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify(orderData)
+    })
+    .then(() => {
         // ===== 2. SEND EMAIL COPY (YOUR ORIGINAL SYSTEM) =====
+        // Build detailed order summary for email
         let emailOrderSummary = "📄 *DETAILED ORDER COPY (CANNOT BE EDITED)* 📄\n\n"
         emailOrderSummary += `Order #${orderId}\n`
         emailOrderSummary += `Date: ${timestamp}\n`
@@ -3151,43 +3141,14 @@ function placeOrder(){
             whatsappBtn.innerHTML = originalText
             whatsappBtn.disabled = false
         }, 1500)
-    };
-    
-    // Create script tag for JSONP
-    const script = document.createElement('script');
-    script.src = `${SHEETS_API}?callback=${callbackName}`;
-    
-    // Error handling
-    script.onerror = function() {
-        delete window[callbackName];
-        alert("Failed to save order. Please check your internet connection and try again.");
-        whatsappBtn.innerHTML = originalText;
-        whatsappBtn.disabled = false;
-    };
-    
-    // Create form to send data
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `${SHEETS_API}?callback=${callbackName}`;
-    form.style.display = 'none';
-    
-    const input = document.createElement('input');
-    input.name = 'data';
-    input.value = JSON.stringify(orderData);
-    form.appendChild(input);
-    
-    // Add to page and submit
-    document.body.appendChild(form);
-    document.body.appendChild(script);
-    form.submit();
-    
-    // Remove elements after submission
-    setTimeout(() => {
-        if (form.parentNode) document.body.removeChild(form);
-        if (script.parentNode) document.body.removeChild(script);
-    }, 5000);
+    })
+    .catch(error => {
+        alert("Failed to save order. Please try again.")
+        console.error("Order save error:", error)
+        whatsappBtn.innerHTML = originalText
+        whatsappBtn.disabled = false
+    })
 }
-
 // Handle window resize
 window.addEventListener('resize', function() {
     if (window.innerWidth > 768) {
@@ -3257,6 +3218,3 @@ document.head.appendChild(style)
 </script>
 </body>
 </html>
-
-
-
