@@ -367,8 +367,18 @@
                     <div class="info-row">
                         <div class="info-label">Payment:</div>
                         <div class="info-value">${order.paymentMethod}</div>
-                    </div>
-                </div>
+                    </div>`;
+            
+            // ADD DELIVERY ADDRESS IF EXISTS
+            if (order.deliveryAddress && order.deliveryAddress !== 'Self Pickup') {
+                html += `
+                    <div class="info-row">
+                        <div class="info-label">Delivery Address:</div>
+                        <div class="info-value">${order.deliveryAddress}</div>
+                    </div>`;
+            }
+            
+            html += `</div>
                 
                 <table class="items-table">
                     <thead>
@@ -376,6 +386,7 @@
                             <th>Item</th>
                             <th>Qty</th>
                             <th>Price</th>
+                            <th>Rate/KG</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -391,6 +402,7 @@
                         </td>
                         <td>${item.qty}</td>
                         <td>Rs ${formatNumber(item.price)}</td>
+                        <td>Rs ${item.rate}/KG</td>
                         <td>Rs ${formatNumber(item.price * item.qty)}</td>
                     </tr>`;
             });
@@ -403,16 +415,22 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="3" style="text-align: right;">Subtotal:</td>
+                            <td colspan="4" style="text-align: right;">Subtotal:</td>
                             <td><strong>Rs ${formatNumber(subtotal)}</strong></td>
-                        </tr>
-                        ${deliveryCharges > 0 ? `
+                        </tr>`;
+            
+            // ADD DELIVERY CHARGES IF EXISTS
+            if (deliveryCharges > 0) {
+                html += `
                         <tr>
-                            <td colspan="3" style="text-align: right;">Delivery:</td>
+                            <td colspan="4" style="text-align: right;">Delivery Charges:</td>
                             <td><strong>Rs ${formatNumber(deliveryCharges)}</strong></td>
-                        </tr>` : ''}
+                        </tr>`;
+            }
+            
+            html += `
                         <tr class="total-row">
-                            <td colspan="3">GRAND TOTAL:</td>
+                            <td colspan="4">GRAND TOTAL:</td>
                             <td>Rs ${formatNumber(order.totalAmount)}</td>
                         </tr>
                     </tfoot>
